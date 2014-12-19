@@ -23,75 +23,98 @@ Prefix = {
 Rolls = {
 	//["Unique Name"] = {
 		//["Effect"] = function( ply ) //What happens to the player goes here
+		//	return //true/false if the function succeeded/failed
 		//end,
-		//["Weight"] = 30 //Weight of the action
+		//["Weight"] = 30, //Weight of the action
+		//["Message"] = function( ply )
+			//function called when roll is successful, should be used for calling a success message
+		//end,
 	//}
 	[1] = { //Add 5 Health
 		["Effect"] = function( ply )
 			local old = ply:Health()
 			ply:SetHealth( ply:Health() + 5)
-			ply:ChatPrint( "Your health has been set to "..ply:Health().."!" )
+			return (old < ply:Health() and true or false)
 		end,
 		["Weight"] = 30,
+		["Message"] = function( ply )
+			ply:ChatPrint( "Your health has been set to "..ply:Health().."!" )
+		end,
 	},
 	[2] = { //Add 5 Armor
 		["Effect"] = function( ply )
 			ply:SetArmor( ply:Armor() + 5)
-			ply:ChatPrint( "Your Armor has been set to "..ply:Armor().."!" )
-			return true
+			return (old < ply:Armor() and true or false)
 		end,
-		["Weight"] = 30
+		["Weight"] = 30,
+		["Message"] = function( ply )
+			ply:ChatPrint( "Your Armor has been set to "..ply:Armor().."!" )
+		end,
 	},
 	[3] = { //Kill the player
 		["Effect"] = function( ply )
 			ply:Kill()
-			ply:ChatPrint( "Your have been murdered by the dice! :(" )
-			return true
+			return not ply:Alive()
 		end,
-		["Weight"] = 1
+		["Weight"] = 1,
+		["Message"] = function( ply )
+			ply:ChatPrint( "Your have been murdered by the dice! :(" )
+		end,
 	},
 	[4] = { //Strip weapons
 		["Effect"] = function( ply )
 			ply:StripWeapons()
-			ply:ChatPrint( "Your weapons were stripped!" )
-			return true
+			
+			return (#ply:GetWeapons()==0)
 		end,
-		["Weight"] = 1
+		["Weight"] = 1,
+		["Message"] = function( ply )
+			ply:ChatPrint( "Your weapons were stripped!" )
+		end,
 	},
 	[5] = { //Low gravity for 10 seconds
 		["Effect"] = function( ply )
+			ply.oldg = ply:GetGravity()
 			ply:SetGravity( 0.5 )
-			ply:ChatPrint( "You now have low gravity for 10 seconds!" )
 			timer.Simple(10, function()
-				if IsValid(ply) then
+				if IsValid(ply) and ply.oldg != ply:GetGravity() then
 					ply:SetGravity(1)
 					ply:ChatPrint( "Your gravity is now normal!" )
 				end
 			end)
-
+			return (ply:GetGravity()==0.5)
 		end,
-		["Weight"] = 10
+		["Weight"] = 10,
+		["Message"] = function( ply )
+			ply:ChatPrint( "You now have low gravity for 10 seconds!" )
+		end,
 	},
 	[6] = { //High gravity for 10 seconds
 		["Effect"] = function( ply )
-			ply:SetGravity( 2 )
-			ply:ChatPrint( "You now have High gravity for 10 seconds!" )
+			ply.oldg = ply:GetGravity()
+			//ply:SetGravity( 2 )
 			timer.Simple(10, function()
-				if IsValid(ply) then
+				if IsValid(ply) and ply.oldg != ply:GetGravity() then
 					ply:SetGravity(1)
 					ply:ChatPrint( "You gravity is now normal!" )
 				end
 			end)
+			return (ply:GetGravity()==2)
 		end,
-		["Weight"] = 1
+		["Weight"] = 1,
+		["Message"] = function( ply )
+			ply:ChatPrint( "You now have High gravity for 10 seconds!" )
+		end,
 	},
 	[7] = { //Add spawn a few sent_ball
 		["Effect"] = function( ply )
-			local ball
-			local succ err = xpcall( createBall(), function(err) print("Error:",err) end, ply )
-			ply:ChatPrint( "Spawning a ball!" )
+			local succ = pcall( createBall( ply ))
+			return succ
 		end,
 		["Weight"] = 30,
+		["Message"] = function( ply )
+			ply:ChatPrint( "Spawning a ball!" )
+		end,
 	},
 }
 //END OF CONFIGURATION//
@@ -104,13 +127,23 @@ function createBall( ply ) //DO NOT CALL WITHOUT PCALL
 	ball:SetBallSize( 40 )
 	ball:Spawn()
 	ball:Activate()
+	//return IsValid(ball)
 end
-
+local fails = 0
 function rollTheDice( ply )
+	if fails > 2 then print("EXITING!!!") return end
 	if not IsValid( ply ) then return end
-	local choice = math.random(#Rolls)
+	//local choice = math.random(#Rolls)
+	local choice = 6
 	if not WeightedChances then
-		Rolls[choice].Effect( ply )
+		local succ = Rolls[choice].Effect( ply )
+		if not succ then 
+			fails = fails + 1
+			print("Failed :(")
+			rollTheDice()
+		else
+			Rolls[choice].Message( ply )
+		end
 	else
 		print("Weighted")
 	end
@@ -135,7 +168,7 @@ function callRTD(ply, text, team)
 	if command and roll then
 		print("Rolling")
 		rollTheDice( ply )
-		return tobool(HideChat)
+		return not tobool(HideChat)
 	end
 end
 hook.Add( "PlayerSay", "RTD_Call", callRTD )
