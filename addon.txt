@@ -1,0 +1,9 @@
+"AddonInfo"
+{
+	"name"        "RollTheDice"
+	"version"     "1"
+	"author_name" "Pandaman09"
+	"author_url"  "https://github.com/pandaman09/RollTheDice"
+	"info"        "Roll the dice addon for Garry's Mod"
+	"override"    "0"
+}
