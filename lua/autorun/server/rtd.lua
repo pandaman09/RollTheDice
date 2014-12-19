@@ -6,6 +6,9 @@ HideChat = true
 WeightedChances = false
 //Sets the probibility of getting a roll
 
+RollTime = 100
+//Time until a player can roll again in seconds
+
 ChatText = {
 	[1] = "rtd",
 	[2] = "roll",
@@ -43,6 +46,7 @@ Rolls = {
 	},
 	[2] = { //Add 5 Armor
 		["Effect"] = function( ply )
+			local old = ply:Armor()
 			ply:SetArmor( ply:Armor() + 5)
 			return (old < ply:Armor() and true or false)
 		end,
@@ -108,7 +112,7 @@ Rolls = {
 	},
 	[7] = { //Add spawn a few sent_ball
 		["Effect"] = function( ply )
-			local succ = pcall( createBall( ply ))
+			local succ = pcall( function() createBall( ply ) end)
 			return succ
 		end,
 		["Weight"] = 30,
@@ -129,24 +133,32 @@ function createBall( ply ) //DO NOT CALL WITHOUT PCALL
 	ball:Activate()
 	//return IsValid(ball)
 end
+
 local fails = 0
 function rollTheDice( ply )
-	if fails > 2 then print("EXITING!!!") return end
+	if fails > 2 then fails = 0 return end
 	if not IsValid( ply ) then return end
-	//local choice = math.random(#Rolls)
-	local choice = 6
+	ply.lastRoll = ply.lastRoll or 1
+	print(ply.lastRoll)
+	if (ply.lastRoll+RollTime) > CurTime() then 
+		local nexttime = math.Round((ply.lastRoll+RollTime)-CurTime())
+		ply:ChatPrint("You cannot roll the dice for another ".. nexttime .. " seconds!")
+		return
+	end
+	local choice = math.random(#Rolls)
 	if not WeightedChances then
 		local succ = Rolls[choice].Effect( ply )
 		if not succ then 
 			fails = fails + 1
 			print("Failed :(")
-			rollTheDice()
+			rollTheDice( ply )
 		else
 			Rolls[choice].Message( ply )
 		end
 	else
 		print("Weighted")
 	end
+	ply.lastRoll = CurTime()
 end
 
 function callRTD(ply, text, team)
